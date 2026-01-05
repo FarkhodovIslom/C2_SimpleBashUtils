@@ -1,7 +1,9 @@
-#ifndef S21_CAT_H
-#define S21_CAT_H
+#ifndef SRC_CAT_S21_CAT_H_
+#define SRC_CAT_S21_CAT_H_
 
-#include "../common/common.h"
+#include <getopt.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 typedef struct {
   int number_nonblank;  // -b
@@ -9,12 +11,12 @@ typedef struct {
   int number;           // -n
   int squeeze_blank;    // -s
   int show_tabs;        // -t, -T
-  int show_nonprint;    // -v ( -e -t)
-} CatFlags;
+  int show_nonprinting; // -v (implied by -e and -t)
+} CatOptions;
 
-void init_flags(CatFlags *flags);
-int parse_arguments(int argc, char *argv[], CatFlags *flags);
-int process_file(const char *filename, CatFlags *flags);
-void print_char(unsigned char c, CatFlags *flags);
+void init_options(CatOptions* options);
+int parse_arguments(int argc, char** argv, CatOptions* options);
+void process_file(const char* filename, CatOptions* options);
+void process_stream(FILE* file, CatOptions* options);
 
-#endif 
+#endif  // SRC_CAT_S21_CAT_H_

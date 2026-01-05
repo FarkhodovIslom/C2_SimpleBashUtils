@@ -1,0 +1,10 @@
+This is a simple test file.
+
+It has some empty lines.
+
+
+And it also has tabs	here	and	here.
+
+Non-printable characters test: 
+
+End of file.

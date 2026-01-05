@@ -1,0 +1,8 @@
+Hello World
+This is a test file
+for grep utility
+HELLO world
+Testing case sensitivity
+Line with numbers 12345
+Another line
+test TEST Test

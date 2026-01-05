@@ -1,7 +1,7 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -Werror -std=c11
-TARGET = s21_cat
-SOURCES = s21_cat.c
+TARGET = s21_grep
+SOURCES = s21_grep.c
 OBJECTS = $(SOURCES:.c=.o)
 
 all: $(TARGET)
@@ -18,7 +18,7 @@ clean:
 rebuild: clean all
 
 test: $(TARGET)
-	@echo "Running basic cat tests..."
-	@./test_cat.sh || true
+	@echo "Running basic grep tests..."
+	@./test_grep.sh || true
 
 .PHONY: all clean rebuild test

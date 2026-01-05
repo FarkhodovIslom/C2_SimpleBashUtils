@@ -1,15 +1,15 @@
 #include "s21_cat.h"
 
-void init_flags(CatFlags *flags) {
-  flags->number_nonblank = 0;
-  flags->show_ends = 0;
-  flags->number = 0;
-  flags->squeeze_blank = 0;
-  flags->show_tabs = 0;
-  flags->show_nonprint = 0;
+void init_options(CatOptions* options) {
+  options->number_nonblank = 0;
+  options->show_ends = 0;
+  options->number = 0;
+  options->squeeze_blank = 0;
+  options->show_tabs = 0;
+  options->show_nonprinting = 0;
 }
 
-int parse_arguments(int argc, char *argv[], CatFlags *flags) {
+int parse_arguments(int argc, char** argv, CatOptions* options) {
   int opt;
   struct option long_options[] = {
       {"number-nonblank", no_argument, NULL, 'b'},
@@ -17,149 +17,138 @@ int parse_arguments(int argc, char *argv[], CatFlags *flags) {
       {"squeeze-blank", no_argument, NULL, 's'},
       {NULL, 0, NULL, 0}};
 
-  while ((opt = getopt_long(argc, argv, "beEnstTv", long_options, NULL)) !=
+  while ((opt = getopt_long(argc, argv, "+benstvTE", long_options, NULL)) !=
          -1) {
     switch (opt) {
       case 'b':
-        flags->number_nonblank = 1;
+        options->number_nonblank = 1;
         break;
       case 'e':
-        flags->show_ends = 1;
-        flags->show_nonprint = 1;
+        options->show_ends = 1;
+        options->show_nonprinting = 1;
         break;
       case 'E':
-        flags->show_ends = 1;
+        options->show_ends = 1;
         break;
       case 'n':
-        flags->number = 1;
+        options->number = 1;
         break;
       case 's':
-        flags->squeeze_blank = 1;
+        options->squeeze_blank = 1;
         break;
       case 't':
-        flags->show_tabs = 1;
-        flags->show_nonprint = 1;
+        options->show_tabs = 1;
+        options->show_nonprinting = 1;
         break;
       case 'T':
-        flags->show_tabs = 1;
+        options->show_tabs = 1;
         break;
       case 'v':
-        flags->show_nonprint = 1;
+        options->show_nonprinting = 1;
         break;
       default:
-        return ERROR;
+        return 1;
     }
   }
 
-  // -b переопределяет -n
-  if (flags->number_nonblank) {
-    flags->number = 0;
+  // -b overrides -n
+  if (options->number_nonblank) {
+    options->number = 0;
   }
 
-  return SUCCESS;
+  return 0;
 }
 
-void print_char(unsigned char c, CatFlags *flags) {
-  if (flags->show_nonprint) {
-    if (c > 127 && c < 160) {
-      printf("M-^");
-      c = c - 128 + 64;
+void print_char(int c, CatOptions* options) {
+  if (options->show_tabs && c == '\t') {
+    printf("^I");
+  } else if (options->show_nonprinting && c != '\n' && c != '\t') {
+    if (c < 32) {
+      printf("^%c", c + 64);
     } else if (c == 127) {
       printf("^?");
-      return;
-    } else if (c < 32 && c != '\n' && c != '\t') {
-      printf("^");
-      c = c + 64;
-    } else if (c > 127) {
-      printf("M-");
-      c = c - 128;
+    } else if (c >= 128 && c < 160) {
+      printf("M-^%c", c - 64);
+    } else if (c >= 160) {
+      printf("M-%c", c - 128);
+    } else {
+      putchar(c);
     }
-  }
-
-  if (c == '\t' && flags->show_tabs) {
-    printf("^I");
   } else {
     putchar(c);
   }
 }
 
-int process_file(const char *filename, CatFlags *flags) {
-  FILE *file = fopen(filename, "r");
-  if (!file) {
-    print_error("s21_cat", "cannot open file");
-    return ERROR;
-  }
-
-  int line_num = 1;
-  int empty_count = 0;
-  int at_line_start = 1;
-  int last_was_newline = 0;
-
+void process_stream(FILE* file, CatOptions* options) {
   int c;
-  while ((c = fgetc(file)) != EOF) {
-    if (flags->squeeze_blank) {
-      if (c == '\n') {
-        if (last_was_newline) {
-          empty_count++;
-          if (empty_count > 1) {
-            continue;
-          }
-        } else {
-          empty_count = 0;
-        }
-        last_was_newline = 1;
-      } else {
-        last_was_newline = 0;
-        empty_count = 0;
-      }
-    }
+  int line_number = 1;
+  int is_new_line = 1;
+  int blank_count = 0;
 
-    if (at_line_start) {
-      if (flags->number_nonblank) {
-        if (c != '\n') {
-          printf("%6d\t", line_num++);
-        }
-      } else if (flags->number) {
-        printf("%6d\t", line_num++);
+  while ((c = fgetc(file)) != EOF) {
+    if (is_new_line) {
+      if (c == '\n') {
+        blank_count++;
+      } else {
+        blank_count = 0;
       }
-      at_line_start = 0;
+
+      // Skip if squeezing and more than one blank line
+      if (options->squeeze_blank && blank_count > 1) {
+        continue;
+      }
+
+      // Print line number if needed
+      if (options->number_nonblank && c != '\n') {
+        printf("%6d\t", line_number++);
+      } else if (options->number && !options->number_nonblank) {
+        printf("%6d\t", line_number++);
+      }
+
+      is_new_line = 0;
     }
 
     if (c == '\n') {
-      if (flags->show_ends) {
-        putchar('$');
+      if (options->show_ends) {
+        printf("$");
       }
       putchar('\n');
-      at_line_start = 1;
+      is_new_line = 1;
     } else {
-      print_char((unsigned char)c, flags);
+      print_char(c, options);
     }
   }
-
-  fclose(file);
-  return SUCCESS;
 }
 
-int main(int argc, char *argv[]) {
-  CatFlags flags;
-  init_flags(&flags);
+void process_file(const char* filename, CatOptions* options) {
+  FILE* file = fopen(filename, "r");
+  if (file == NULL) {
+    fprintf(stderr, "s21_cat: %s: No such file or directory\n", filename);
+    return;
+  }
 
-  if (parse_arguments(argc, argv, &flags) == ERROR) {
-    fprintf(stderr, "Usage: s21_cat [OPTION]... [FILE]...\n");
-    return ERROR;
+  process_stream(file, options);
+  fclose(file);
+}
+
+int main(int argc, char** argv) {
+  CatOptions options;
+  init_options(&options);
+
+  if (parse_arguments(argc, argv, &options) != 0) {
+    fprintf(stderr, "usage: s21_cat [-benstvET] [file ...]\n");
+    return 1;
   }
 
   if (optind >= argc) {
-    fprintf(stderr, "s21_cat: missing file operand\n");
-    return ERROR;
-  }
-
-  int status = SUCCESS;
-  for (int i = optind; i < argc; i++) {
-    if (process_file(argv[i], &flags) == ERROR) {
-      status = ERROR;
+    // No files specified, read from stdin
+    process_stream(stdin, &options);
+  } else {
+    // Process each file
+    for (int i = optind; i < argc; i++) {
+      process_file(argv[i], &options);
     }
   }
 
-  return status;
+  return 0;
 }
